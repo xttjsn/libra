@@ -5,17 +5,21 @@
 //!
 //! Currently, the information shared as part of this protocol includes the peer identity and a
 //! list of protocols supported by the peer.
-use crate::ProtocolId;
+use std::env;
+use std::io;
+
 use bytes::BytesMut;
 use futures::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use serde::{Deserialize, Serialize};
+
 use libra_types::PeerId;
 use netcore::{
     framing::{read_u16frame, write_u16frame},
     negotiate::{negotiate_inbound, negotiate_outbound_interactive},
     transport::ConnectionOrigin,
 };
-use serde::{Deserialize, Serialize};
-use std::io;
+
+use crate::ProtocolId;
 
 const IDENTITY_PROTOCOL_NAME: &[u8] = b"/identity/0.1.0";
 
@@ -24,6 +28,7 @@ const IDENTITY_PROTOCOL_NAME: &[u8] = b"/identity/0.1.0";
 pub struct Identity {
     peer_id: PeerId,
     supported_protocols: Vec<ProtocolId>,
+    version: String,
 }
 
 impl Identity {
@@ -31,6 +36,7 @@ impl Identity {
         Self {
             peer_id,
             supported_protocols,
+            version: format!("libra/network:{}", env!("CARGO_PKG_VERSION"))
         }
     }
 
@@ -92,14 +98,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        protocols::identity::{exchange_identity, Identity},
-        ProtocolId,
-    };
     use futures::{executor::block_on, future::join};
+
     use libra_types::PeerId;
     use memsocket::MemorySocket;
     use netcore::transport::ConnectionOrigin;
+
+    use crate::{
+        ProtocolId,
+        protocols::identity::{exchange_identity, Identity},
+    };
 
     fn build_test_connection() -> (MemorySocket, MemorySocket) {
         MemorySocket::new_pair()
